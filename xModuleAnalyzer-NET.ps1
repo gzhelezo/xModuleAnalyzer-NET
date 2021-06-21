@@ -155,7 +155,7 @@ $ModuleCnt = 0
 ForEach ($Dir in $ProjectDirs) {
 	$ModuleCnt++
 	$ScanDir = $Dir.FullName
-	$csprojFile = Get-ChildItem -Path $ScanDir -File | ? {$_.Extension -ieq '.csproj'} | % {$_.FullName}
+	$csprojFile = Get-ChildItem -Exclude *test*, *Fakes* -Recurse -Path $ScanDir -File | ? {$_.Extension -ieq '.csproj'} | % {$_.FullName}
 	
 	If ($csprojFile) {
 		[xml]$csprojXml = Get-Content -Path $csprojFile
