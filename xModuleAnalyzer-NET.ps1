@@ -1,4 +1,4 @@
-﻿param(
+param(
 	[string]$xModulePath = "multi-module-setup_net.txt",
 	[string]$fsaJarPath = "wss-unified-agent.jar",
 	[string]$c = "wss-unified-agent-EUA-net.config",
@@ -124,27 +124,19 @@ Function Title([string]$Text) {
 Write-Host ""
 Log "$HdrTitle"
 
-If (!(Test-Path -Path "$fsaJarPath")) {
-	
-	Log "Downloading WhiteSource Unified Agent..."
-	try {
-		Invoke-WebRequest -Uri "https://unified-agent.s3.amazonaws.com/wss-unified-agent.jar" -OutFile "$fsaJarPath"
-	} catch {
-		Terminate "Download Failed: $_"
-	}
-}
 If (!(Test-Path -Path "$c")) { Terminate "EUA config file not found: $c" }
 If (!(Test-Path -Path "$d")) { Terminate "Directory not found: $d" } Else {
 	If (!$productName) {$productName = Split-Path -Path "$d" -Leaf}
-	$firstProjFile = Get-ChildItem -Path "$d" -Recurse -File | ? {$_.Extension -ieq '.csproj'} | Select -First 1 -ExpandProperty FullName
-	If ($firstProjFile) {
-		$RootDir = Split-Path -Path (Split-Path -Path $firstProjFile)
-	}
+	#$firstProjFile = Get-ChildItem -Path "$d" -Recurse -File | ? {$_.Extension -ieq '.csproj'} | Select -First 1 -ExpandProperty FullName
+	#If ($firstProjFile) {
+	#	$RootDir = Split-Path -Path (Split-Path -Path $firstProjFile)
+	#}
+    $RootDir = $d;
 }
 
 $SetupFileName = (Split-Path -Path $xModulePath -Leaf)
 
-$ProjectDirs = Get-ChildItem -Path $RootDir -Directory
+$ProjectDirs = Get-ChildItem -Path $RootDir -Recurse -File | ? {$_.Extension -ieq '.csproj' -and $_.FullName -notmatch 'test' -and $_.FullName -notmatch 'Fakes'} | Select $_
 $XPath = "/Project/PropertyGroup"
 
 Title "Generating setup file"
@@ -152,13 +144,14 @@ Title "Generating setup file"
 ("DependencyManagerFilePath=" + ("$RootDir" -replace '\\','/')) > "$xModulePath"
 
 $ModuleCnt = 0
-ForEach ($Dir in $ProjectDirs) {
+ForEach ($csprojFile in $ProjectDirs) {
 	$ModuleCnt++
-	$ScanDir = $Dir.FullName
-	$csprojFile = Get-ChildItem -Exclude *test*, *Fakes* -Recurse -Path $ScanDir -File | ? {$_.Extension -ieq '.csproj'} | % {$_.FullName}
+	$ScanDir = $csprojFile.Directory
+	$Dir = $csprojFile.Directory
 	
+	#$csprojFile = Get-ChildItem -Exclude *test*, *Fakes* -Recurse -Path $ScanDir -File | ? {$_.Extension -ieq '.csproj'} | % {$_.FullName}	
 	If ($csprojFile) {
-		[xml]$csprojXml = Get-Content -Path $csprojFile
+		[xml]$csprojXml = Get-Content -Path $csprojFile.FullName
 		$AssemblyName = (($csprojXml.Project.PropertyGroup | % {$_.AssemblyName }) -as [string]).Trim()
 		$OutputType = (($csprojXml.Project.PropertyGroup | % {$_.OutputType }) -as [string]).Trim()
 		
